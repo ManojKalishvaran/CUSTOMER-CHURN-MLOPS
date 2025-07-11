@@ -41,7 +41,7 @@ stages:
         containerRegistry: 'acr-connection'
         repository: '$(trainingInferenceImageName)'
         command: 'buildAndPush'
-        Dockerfile: '**/Training-Inferencing'
+        Dockerfile: '**/Training-Inferencing/Dockerfile'
         tags: $(tag)
 
     - script: |
