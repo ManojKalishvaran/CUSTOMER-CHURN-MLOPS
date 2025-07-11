@@ -16,8 +16,8 @@ variables:
   trainingInferenceImageName: 'churn-prediction'
   tag: 'latest'
 
-Stages: 
-- Stag: Build
+stagee: 
+- stage: Build
   displayName: 'BUILD & PUSH DOCKER IMAGES'
   jobs:
 
