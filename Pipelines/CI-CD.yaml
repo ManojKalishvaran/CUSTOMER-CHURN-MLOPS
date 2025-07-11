@@ -53,7 +53,7 @@ stages:
           -e AZURE_CLIENT_ID="$(SPclientID1)" \
           -e AZURE_CLIENT_SECRET="$(SPclientSecret1)" \
           -e AZURE_TENANT_ID="$(SPtenentID1)" \
-          manojacrregistry.azurecr.io/$(trainingImageName):$(tag)
+          manojacrregistry.azurecr.io/$(trainingInferenceImageName):$(tag)
       displayName: "Runing Image for Training"
 
 - stage: Deploy
