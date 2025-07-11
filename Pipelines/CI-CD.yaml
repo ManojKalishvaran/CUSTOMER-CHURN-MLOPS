@@ -16,7 +16,7 @@ variables:
   trainingInferenceImageName: 'churn-prediction'
   tag: 'latest'
 
-stagee: 
+stages: 
 - stage: Build
   displayName: 'BUILD & PUSH DOCKER IMAGES'
   jobs:
@@ -64,7 +64,7 @@ stagee:
   - job: DeployInference
     displayName: 'Deploy for inference'
     steps:
-    - task: AzrueWebAppContainer@1
+    - task: AzureWebAppContainer@1
       displayName: 'Deploying...'
       inputs:
         azureSubscription: 'az-sub'
