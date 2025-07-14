@@ -65,7 +65,7 @@ stages:
     displayName: 'Configure Web App with ACR Image'
     steps:
     - task: AzureCLI@2
-      displayName: 'Set App Service Container with Managed Identity'
+      displayName: 'Set App Service Container with ACR Image'
       inputs:
         azureSubscription: $(azureSubscription)
         scriptType: 'bash'
@@ -77,8 +77,8 @@ stages:
             --name $(webAppName) \
             --resource-group $(resourceGroup) \
             --docker-custom-image-name $(acrLoginServer)/$(trainingInferenceImageName):$(tag) \
-            --docker-registry-server-url https://$(acrLoginServer) \
-            --enable-managed-identity true
+            --docker-registry-server-url https://$(acrLoginServer)
+
 
     - task: AzureCLI@2
       displayName: 'Restart App Service'
