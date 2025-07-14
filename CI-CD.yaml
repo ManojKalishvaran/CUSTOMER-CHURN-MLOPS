@@ -7,7 +7,6 @@ trigger:
   paths:
     include:
       - Training-Inferencing/**
-      # - README.md
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -15,16 +14,18 @@ pool:
 variables:
   trainingInferenceImageName: 'churn-prediction'
   tag: 'latest'
+  resourceGroup: 'manoj_rg'                    # 🔁 Replace with your actual RG
+  webAppName: 'churn-prediction'                        # 🔁 Ensure this is correct
+  acrLoginServer: 'manojacrregistry.azurecr.io'
+  azureSubscription: 'az-sub'                           # 🔁 This is your service connection name
 
 stages: 
 - stage: Build
   displayName: 'BUILD & PUSH DOCKER IMAGES'
   jobs:
-
   - job: LoginAndBuild
     displayName: 'KEY VAULT LOGIN & BUILD'
     steps: 
-
     - task: AzureKeyVault@2
       name: FetchSecrets
       inputs: 
@@ -46,27 +47,47 @@ stages:
 
     - script: |
         echo "Pulling Image From ACR"
-        docker pull manojacrregistry.azurecr.io/$(trainingInferenceImageName):$(tag)
+        docker pull $(acrLoginServer)/$(trainingInferenceImageName):$(tag)
 
         echo "Running Image for Training..."
         docker run \
           -e AZURE_CLIENT_ID="$(SPclientID1)" \
           -e AZURE_CLIENT_SECRET="$(SPclientSecret1)" \
           -e AZURE_TENANT_ID="$(SPtenentID1)" \
-          manojacrregistry.azurecr.io/$(trainingInferenceImageName):$(tag) main/training.py
+          $(acrLoginServer)/$(trainingInferenceImageName):$(tag) main/training.py
       displayName: "Runing Image for Training"
 
 - stage: Deploy
-  displayName: 'Deploy Image to AAS for inference'
+  displayName: 'Deploy Image to AAS for inferencing'
   dependsOn: Build
-  condition: succeeded()
-  jobs: 
-  - job: DeployInference
-    displayName: 'Deploy for inference'
+  jobs:
+  - job: DeployToAppService
+    displayName: 'Configure Web App with ACR Image'
     steps:
-    - task: AzureWebAppContainer@1
-      displayName: 'Deploying...'
+    - task: AzureCLI@2
+      displayName: 'Set App Service Container with Managed Identity'
       inputs:
-        azureSubscription: 'az-sub'
-        appName: 'churn-prediction'
-        containers: 'manojacrregistry.azurecr.io/$(trainingInferenceImageName):$(tag)'
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Setting container configuration for App Service..."
+
+          az webapp config container set \
+            --name $(webAppName) \
+            --resource-group $(resourceGroup) \
+            --docker-custom-image-name $(acrLoginServer)/$(trainingInferenceImageName):$(tag) \
+            --docker-registry-server-url https://$(acrLoginServer) \
+            --enable-managed-identity true
+
+    - task: AzureCLI@2
+      displayName: 'Restart App Service'
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Restarting App Service..."
+          az webapp restart \
+            --name $(webAppName) \
+            --resource-group $(resourceGroup)

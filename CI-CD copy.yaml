@@ -1,0 +1,72 @@
+name: CHRUN-Prediction$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - Training-Inferencing/**
+      # - README.md
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  trainingInferenceImageName: 'churn-prediction'
+  tag: 'latest'
+
+stages: 
+- stage: Build
+  displayName: 'BUILD & PUSH DOCKER IMAGES'
+  jobs:
+
+  - job: LoginAndBuild
+    displayName: 'KEY VAULT LOGIN & BUILD'
+    steps: 
+
+    - task: AzureKeyVault@2
+      name: FetchSecrets
+      inputs: 
+        azureSubscription: 'az-sub'
+        KeyVaultName: 'manoj-key-water'
+        SecretsFilter: "*"
+        RunAsPreJob: true
+
+    - checkout: self 
+
+    - task: Docker@2
+      displayName: 'Build & Push IMAGES'
+      inputs:
+        containerRegistry: 'acr-connection'
+        repository: '$(trainingInferenceImageName)'
+        command: 'buildAndPush'
+        Dockerfile: '**/Training-Inferencing/Dockerfile'
+        tags: $(tag)
+
+    - script: |
+        echo "Pulling Image From ACR"
+        docker pull manojacrregistry.azurecr.io/$(trainingInferenceImageName):$(tag)
+
+        echo "Running Image for Training..."
+        docker run \
+          -e AZURE_CLIENT_ID="$(SPclientID1)" \
+          -e AZURE_CLIENT_SECRET="$(SPclientSecret1)" \
+          -e AZURE_TENANT_ID="$(SPtenentID1)" \
+          manojacrregistry.azurecr.io/$(trainingInferenceImageName):$(tag) main/training.py
+      displayName: "Runing Image for Training"
+
+- stage: Deploy
+  displayName: 'Deploy Image to AAS for inference'
+  dependsOn: Build
+  condition: succeeded()
+  jobs: 
+  - job: DeployInference
+    displayName: 'Deploy for inference'
+    steps:
+    - task: AzureWebAppContainer@1
+      displayName: 'Deploying...'
+      inputs:
+        azureSubscription: 'az-sub'
+        appName: 'churn-prediction'
+        containers: 'manojacrregistry.azurecr.io/$(trainingInferenceImageName):$(tag)'
