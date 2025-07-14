@@ -62,8 +62,8 @@ print(f"=====================Total time taken.... {(en-st)}s====================
 @app.route("/")
 def home():
     if model is None:
-        return {"status": "model failed to load"}, 500
-    return {"status": "okay"}
+        return {"status": "model failed to load new"}, 500
+    return {"status": "okay new"}
 
 
 @app.route("/model_info")
