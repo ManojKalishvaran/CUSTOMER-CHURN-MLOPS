@@ -56,9 +56,15 @@ logging.info("finished loading model...")
 en = datetime.now()
 
 print(f"=====================Total time taken.... {(en-st)}s============================")
+# @app.route("/")
+# def home():
+#     # return {"status":"okay"}
 @app.route("/")
 def home():
-    return {"status":"okay"}
+    if model is None:
+        return {"status": "model failed to load"}, 500
+    return {"status": "okay"}
+
 
 @app.route("/model_info")
 def returnmodel_info():
