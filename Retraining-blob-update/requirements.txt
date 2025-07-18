@@ -1,0 +1,9 @@
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.0
+evidently==0.4.19
+azure-identity==1.15.0
+azure-storage-blob==12.19.1
+requests==2.32.3
+pprintpp==0.4.0
+flask==3.0.3

@@ -1,0 +1,93 @@
+name: Retraining-CHRUN-Prediction$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger: none
+  # branches:
+  #   include:
+  #     - main
+  # paths:
+  #   include:
+  #     - Retraining-blob-update/**
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  trainingInferenceImageName: 'retraining-churn-prediction'
+  tag: 'latest'
+  resourceGroup: 'manoj_rg'                    # 🔁 Replace with your actual RG
+  webAppName: 'churn-prediction'                        # 🔁 Ensure this is correct
+  acrLoginServer: 'manojacrregistry.azurecr.io'
+  azureSubscription: 'az-sub'                           # 🔁 This is your service connection name
+
+stages: 
+- stage: Build
+  displayName: 'BUILD & PUSH DOCKER IMAGES'
+  jobs:
+  - job: LoginAndBuild
+    displayName: 'KEY VAULT LOGIN & BUILD'
+    steps: 
+    - task: AzureKeyVault@2
+      name: FetchSecrets
+      inputs: 
+        azureSubscription: 'az-sub'
+        KeyVaultName: 'manoj-key-water'
+        SecretsFilter: "*"
+        RunAsPreJob: true
+
+    - checkout: self 
+
+    - task: Docker@2
+      displayName: 'Build & Push IMAGES'
+      inputs:
+        containerRegistry: 'acr-connection'
+        repository: '$(trainingInferenceImageName)'
+        command: 'buildAndPush'
+        Dockerfile: '**/Retraining-blob-update/Dockerfile'
+        tags: $(tag)
+
+    - script: |
+        echo "Pulling Image From ACR"
+        docker pull $(acrLoginServer)/$(trainingInferenceImageName):$(tag)
+
+        echo "Running Image for Training..."
+        docker run \
+          -e AZURE_CLIENT_ID="$(SPclientID1)" \
+          -e AZURE_CLIENT_SECRET="$(SPclientSecret1)" \
+          -e AZURE_TENANT_ID="$(SPtenentID1)" \
+          $(acrLoginServer)/$(trainingInferenceImageName):$(tag) main/retraining.py
+      displayName: "Runing Image for Training"
+
+- stage: Deploy
+  displayName: 'Deploy Image to AAS for inferencing'
+  dependsOn: Build
+  jobs:
+  - job: DeployToAppService
+    displayName: 'Configure Web App with ACR Image'
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Set App Service Container with ACR Image'
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Setting container configuration for App Service..."
+
+          az webapp config container set \
+            --name $(webAppName) \
+            --resource-group $(resourceGroup) \
+            --docker-custom-image-name $(acrLoginServer)/$(trainingInferenceImageName):$(tag) \
+            --docker-registry-server-url https://$(acrLoginServer)
+
+
+    - task: AzureCLI@2
+      displayName: 'Restart App Service'
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Restarting App Service..."
+          az webapp restart \
+            --name $(webAppName) \
+            --resource-group $(resourceGroup)
